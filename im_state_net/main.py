@@ -135,7 +135,7 @@ class Network:
 
     def change_value(self, node: InputNode[T], new_value: T) -> "Network":
         new_value = node.validate(new_value)
-        old_value = self._values.get(node)
+        old_value = self._initial_values.get(node)
         values = self._values.set(node, new_value)
         if old_value != new_value:
             changes = self._changes.add(node)
@@ -147,6 +147,8 @@ class Network:
         return cast(T, self._values[node])
 
     def commit(self) -> "Network":
+        if len(self._changes) == 0:
+            return self
         nodes = self._nodes
         values = self._values
         changes = self._changes
@@ -160,6 +162,13 @@ class Network:
                     if old_value != new_value:
                         changes = changes.add(node)
         return Network(nodes, values, pset(), values)
+
+    def is_consistent(self) -> bool:
+        """
+        A consistent network is a network which has no pending changes.
+        In other words: It has no changes since the last commit.
+        """
+        return len(self._changes) == 0
 
     def __repr__(self) -> str:
         return str(self)

@@ -5,6 +5,8 @@ POETRY_AVAILABLE := $(shell which poetry > /dev/null && echo 1 || echo 0)
 # CI variables
 CI_EXCLUDED_DIRS = __pycache__ docs tests
 CI_DIRECTORIES=$(filter-out $(CI_EXCLUDED_DIRS), $(foreach dir, $(dir $(wildcard */)), $(dir:/=)))
+FORMAT_EXCLUDED_DIRS = __pycache__ docs
+FORMAT_DIRECTORIES=$(filter-out $(FORMAT_EXCLUDED_DIRS), $(foreach dir, $(dir $(wildcard */)), $(dir:/=)))
 
 
 # Project targets
@@ -51,7 +53,7 @@ format-%:
 	@poetry run black "$*"
 	@poetry run isort "$*"
 
-format: $(addprefix format-, $(CI_DIRECTORIES))
+format: $(addprefix format-, $(FORMAT_DIRECTORIES))
 
 typecheck-%:
 	@echo typecheck-"$*"
