@@ -11,7 +11,8 @@ from im_state_net.network_core import AbstractNode, InputNode, NetworkBuilder
 
 T = TypeVar("T")
 
-class MyBinaryNode(BinaryCalcNode[str, float, int]): 
+
+class MyBinaryNode(BinaryCalcNode[str, float, int]):
     def _calculation(self, value1: float, value2: int) -> str:
         return str(value1 + value2)
 
@@ -82,3 +83,26 @@ def test_reverting_changes():
     network.set_value(network.val1, value1)
 
     assert network.number_of_changes() == 0
+
+
+def test_example():
+
+    builder = NetworkBuilder()
+    val1 = builder.add_input(InputNode(), 1)
+    val2 = builder.add_input(InputNode(), 2)
+    result = builder.add_calculation(LambdaCalcNode(lambda x: x[0] + x[1], [val1, val2]))
+    network = builder.build()
+
+    assert network.get_value(result) == 3
+
+    network = network.change_value(val1, 2)
+    assert network.is_consistent() == False  # Changes are detected
+
+    network = network.change_value(val1, 1)  # The network detects if changes get reverted
+    assert network.is_consistent() == True
+
+    network = network.change_value(
+        val1, 2
+    ).commit()  # or executed them and calculates derived values
+    assert network.is_consistent() == True
+    assert network.get_value(result) == 4
