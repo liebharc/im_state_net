@@ -30,6 +30,7 @@ Use Case: This solution is particularly beneficial when dealing with settings th
 Advantages:
 
 - Detects and allows for the reversal of changes.
+- Allows to combine multiple settings into a single commit.
 - Permits temporary inconsistent states, provided everything is valid upon commit.
 - Offers thread safety, enabling the preparation of subsequent settings while previous ones are still being executed.
 
