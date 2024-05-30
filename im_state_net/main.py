@@ -1,10 +1,10 @@
 import abc
 import uuid
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, cast
 
-from pyrsistent import pset, pvector
-from pyrsistent.typing import PSet, PVector
+from pyrsistent import pmap, pset, pvector
+from pyrsistent.typing import PMap, PSet, PVector
 
 T = TypeVar("T")
 
@@ -19,50 +19,30 @@ class AbstractNode(abc.ABC, Generic[T]):
     def id(self) -> uuid.UUID:
         return self._id
 
-    @property
-    @abc.abstractmethod
-    def value(self) -> T:
-        pass
-
 
 class InputNode(AbstractNode[T], Generic[T]):
-    def __init__(self, value: T) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self._value = value
 
-    @property
-    def value(self) -> T:
-        return self._value
-
-    @abc.abstractmethod
-    def change_value(self, new_value: T) -> "InputNode[T]":
-        pass
-
-
-class ValueNode(InputNode[T], Generic[T]):
-    def __init__(self, value: T) -> None:
-        super().__init__(value)
-
-    @property
-    def value(self) -> T:
-        return self._value
-
-    def change_value(self, new_value: T) -> "ValueNode[T]":
-        copy = ValueNode(new_value)
-        copy._id = self._id
-        return copy
+    def validate(self, value: T) -> T:
+        """
+        Validates the value before setting it. It can
+        coerce the value to a valid one or throw an exception
+        if the value is invalid.
+        """
+        return value
 
     def __repr__(self) -> str:
         return str(self)
 
     def __str__(self) -> str:
-        return f"ValueNode({self._value})"
+        return "InputNode()"
 
 
 U = TypeVar("U", int, float)
 
 
-class NumericMinMaxNode(ValueNode[U]):
+class NumericMinMaxNode(InputNode[U]):
     def __init__(self, value: U, min_value: U, max_value: U) -> None:
         super().__init__(value)  # type: ignore
         self._min_value: U = min_value
@@ -76,130 +56,126 @@ class NumericMinMaxNode(ValueNode[U]):
     def max_value(self) -> U:
         return self._max_value
 
-    def change_value(self, new_value: U) -> "NumericMinMaxNode[U]":
-        if new_value < self._min_value:
-            new_value = self._min_value
-        elif new_value > self._max_value:
-            new_value = self._max_value
-        copy = NumericMinMaxNode(new_value, self._min_value, self._max_value)
-        copy._id = self._id
-        return copy
+    def validate(self, value: U) -> U:
+        if value < self._min_value:
+            return self._min_value
+        elif value > self._max_value:
+            return self._max_value
+        return value
 
     def __repr__(self) -> str:
         return str(self)
 
     def __str__(self) -> str:
-        return f"NumericMinMaxNode({self._value}, {self._min_value}, {self._max_value})"
+        return f"NumericMinMaxNode({self._min_value}, {self._max_value})"
 
 
-class DerivedNode(AbstractNode[T], Generic[T]):
-    def __init__(
-        self, dependencies: list[AbstractNode[Any]], dependency_ids: PSet[uuid.UUID] | None = None
-    ) -> None:
+class DerivedNode(AbstractNode[T], abc.ABC, Generic[T]):
+    def __init__(self, dependencies: list[AbstractNode[Any]]) -> None:
         super().__init__()
         self._dependencies = dependencies
-        self.dependency_ids = dependency_ids or pset([dep.id for dep in dependencies])
 
     @property
     def dependencies(self) -> list[AbstractNode[Any]]:
         return self._dependencies
 
     @abc.abstractmethod
-    def force_calculation(self) -> None:
-        pass
-
-    @abc.abstractmethod
-    def reset(self, dependencies: list[AbstractNode[Any]]) -> "DerivedNode[T]":
-        pass
+    def calculate(self, inputs: list[Any]) -> T:
+        """
+        Calculates the value of the node based on the inputs.
+        The caller guarantees that the inputs are in the same order
+        as the dependencies.
+        """
 
 
 class LambdaCalcNode(DerivedNode[T], Generic[T]):
-    def __init__(
-        self,
-        calculation: Callable[[list[T]], T],
-        dependencies: list[AbstractNode[Any]],
-        dependency_ids: PSet[uuid.UUID] | None = None,
-    ):
-        super().__init__(dependencies=dependencies, dependency_ids=dependency_ids)
+    def __init__(self, calculation: Callable[[list[T]], T], dependencies: list[AbstractNode[Any]]):
+        super().__init__(dependencies=dependencies)
         self._calculation = calculation
-        self._value: T | None = None
 
-    @property
-    def dependencies(self) -> list[AbstractNode[Any]]:
-        return self._dependencies
-
-    @property
-    def value(self) -> T:
-        if self._value is None:
-            self.force_calculation()
-        return self._value  # type: ignore
-
-    def force_calculation(self) -> None:
-        self._value = self._calculation([node.value for node in self._dependencies])
-
-    def reset(self, dependencies: list[AbstractNode[Any]]) -> "LambdaCalcNode[T]":
-        return LambdaCalcNode(self._calculation, dependencies, self.dependency_ids)
+    def calculate(self, inputs: list[T]) -> T:
+        return self._calculation(inputs)
 
     def __repr__(self) -> str:
         return str(self)
 
     def __str__(self) -> str:
-        return f"LambdaCalcNode({self._value})"
+        return "LambdaCalcNode()"
 
 
 class Network:
-    def __init__(self, nodes: PVector[AbstractNode[Any]], changes: PSet[uuid.UUID] | None = None):
-        self.nodes = nodes
-        self.changes = changes or pset()
+    def __init__(
+        self,
+        nodes: PVector[AbstractNode[Any]],
+        values: PMap[AbstractNode[Any], Any],
+        changes: PSet[AbstractNode[Any]] | None = None,
+        initial_values: PMap[AbstractNode[Any], Any] | None = None,
+    ):
+        self._nodes = nodes
+        self._changes = changes or pset()
+        self._values = values
+        # initial values are the values since the last commit
+        self._initial_values = initial_values or values
 
-    def change_value(self, node: ValueNode[T], new_value: T) -> "Network":
+    def change_value(self, node: InputNode[T], new_value: T) -> "Network":
         # Get existing value by ID and replace it by the result of set_value
-        index = self.nodes.index(node)
-        new_node = node.change_value(new_value)
-        return Network(self.nodes.set(index, new_node), self.changes.add(new_node.id))
+        new_value = node.validate(new_value)
+        old_value = self._values.get(node)
+        values = self._values.set(node, new_value)
+        if old_value != new_value:
+            changes = self._changes.add(node)
+        else:
+            changes = self._changes.remove(node)
+        return Network(self._nodes, values, changes, self._initial_values)
 
-    def commit(self, eager: bool = False) -> "Network":
-        nodes = self.nodes
-        changes = self.changes
-        nodes_by_id = {node.id: node for node in nodes}
-        for i, node in enumerate(nodes):
+    def get_value(self, node: AbstractNode[T]) -> T:
+        return cast(T, self._values[node])
+
+    def commit(self) -> "Network":
+        nodes = self._nodes
+        values = self._values
+        changes = self._changes
+        for node in nodes:
             if isinstance(node, DerivedNode):
-                any_deps_changed = not self.changes.isdisjoint(node.dependency_ids)
+                any_deps_changed = not self._changes.isdisjoint(node.dependencies)
                 if any_deps_changed:
-                    updated_dependencies = [nodes_by_id[dep.id] for dep in node.dependencies]
-                    updated_node = node.reset(updated_dependencies)
-                    if eager:
-                        updated_node.force_calculation()
-                    nodes = nodes.set(i, updated_node)
-                    nodes_by_id[node.id] = updated_node
-                    changes = changes.add(updated_node.id)
-        return Network(nodes, pset())
-
-    def eager_commit(self) -> "Network":
-        return self.commit(eager=True)
+                    new_value = node.calculate([values[dep] for dep in node.dependencies])
+                    old_value = self._initial_values.get(node)
+                    values = values.set(node, new_value)
+                    if old_value != new_value:
+                        changes = changes.add(node)
+        return Network(nodes, values, pset(), values)
 
     def __repr__(self) -> str:
         return str(self)
 
     def __str__(self) -> str:
-        if self.changes:
-            return f"Network({self.nodes}, changes={self.changes})"
-        return f"Network({self.nodes})"
+        nodes_and_values = str.join(
+            ", ", [str(node) + ": " + (str(self._values.get(node))) for node in self._nodes]
+        )
+        if self._changes:
+            return f"Network({nodes_and_values}, changes={self._changes})"
+        return f"Network({nodes_and_values})"
 
 
 class NetworkBuilder:
     def __init__(self) -> None:
         self.nodes: list[AbstractNode[Any]] = []
+        self.initial_values: dict[AbstractNode[Any], Any] = {}
 
-    def add_value(self, value: T) -> ValueNode[T]:
-        node = ValueNode(value)
+    def add_input(self, value: T) -> InputNode[T]:
+        node: InputNode[T] = InputNode()
         self.nodes.append(node)
+        self.initial_values[node] = value
         return node
 
     def add_calculation(
         self, calculation: Callable[[list[T]], T], dependencies: list[AbstractNode[Any]]
     ) -> LambdaCalcNode[T]:
         node = LambdaCalcNode(calculation, dependencies)
+        self.initial_values[node] = node.calculate(
+            [self.initial_values[dep] for dep in dependencies]
+        )
         self.nodes.append(node)
         return node
 
@@ -227,21 +203,21 @@ class NetworkBuilder:
         return sorted_nodes
 
     def build(self) -> Network:
-        return Network(pvector(self._sorted_nodes()))
+        return Network(pvector(self._sorted_nodes()), pmap(self.initial_values))
 
 
 if __name__ == "__main__":
     new_net = NetworkBuilder()
-    val1 = new_net.add_value(1)
-    val2 = new_net.add_value(2)
+    val1 = new_net.add_input(1)
+    val2 = new_net.add_input(2)
     val3 = new_net.add_calculation(lambda x: x[0] + x[1], [val1, val2])
 
     network = new_net.build()
-    network = network.eager_commit()
+    network = network.commit()
     print(network)
 
     update = network.change_value(val1, 3)
     print(update)
 
-    update = update.eager_commit()
+    update = update.commit()
     print(update)
