@@ -1,6 +1,7 @@
 from typing import TypeVar
 
-from im_state_net.main import AbstractNode, NetworkBuilder
+from im_state_net.additional_nodes import LambdaCalcNode
+from im_state_net.network_core import AbstractNode, InputNode, NetworkBuilder
 
 T = TypeVar("T")
 
@@ -8,9 +9,11 @@ T = TypeVar("T")
 class SimpleSumNetwork:
     def __init__(self):
         builder = NetworkBuilder()
-        self.val1 = builder.add_input(1)
-        self.val2 = builder.add_input(2)
-        self.calc = builder.add_calculation(lambda x: x[0] + x[1], [self.val1, self.val2])
+        self.val1 = builder.add_input(InputNode(), 1)
+        self.val2 = builder.add_input(InputNode(), 2)
+        self.calc = builder.add_calculation(
+            LambdaCalcNode(lambda x: x[0] + x[1], [self.val1, self.val2])
+        )
         self.network = builder.build()
 
     def get_value(self, node: AbstractNode[T]) -> T:
