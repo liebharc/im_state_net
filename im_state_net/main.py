@@ -11,18 +11,23 @@ T = TypeVar("T")
 
 class AbstractNode(abc.ABC, Generic[T]):
 
-    def __init__(self) -> None:
+    def __init__(self, name: str | None) -> None:
         super().__init__()
-        self._id = uuid.uuid4()
+        self._has_readable_name = False
+        if name:
+            self._name = name
+            self._has_readable_name = True
+        else:
+            self._name = str(uuid.uuid4())
 
     @property
-    def id(self) -> uuid.UUID:
-        return self._id
+    def name(self) -> str:
+        return self._name
 
 
 class InputNode(AbstractNode[T], Generic[T]):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, name: str | None = None) -> None:
+        super().__init__(name)
 
     def validate(self, value: T) -> T:
         """
@@ -36,6 +41,8 @@ class InputNode(AbstractNode[T], Generic[T]):
         return str(self)
 
     def __str__(self) -> str:
+        if self._has_readable_name:
+            return self._name
         return "InputNode()"
 
 
@@ -43,8 +50,8 @@ U = TypeVar("U", int, float)
 
 
 class NumericMinMaxNode(InputNode[U]):
-    def __init__(self, value: U, min_value: U, max_value: U) -> None:
-        super().__init__(value)  # type: ignore
+    def __init__(self, min_value: U, max_value: U, name: str | None = None) -> None:
+        super().__init__(name)
         self._min_value: U = min_value
         self._max_value: U = max_value
 
@@ -67,12 +74,14 @@ class NumericMinMaxNode(InputNode[U]):
         return str(self)
 
     def __str__(self) -> str:
+        if self._has_readable_name:
+            return self._name
         return f"NumericMinMaxNode({self._min_value}, {self._max_value})"
 
 
 class DerivedNode(AbstractNode[T], abc.ABC, Generic[T]):
-    def __init__(self, dependencies: list[AbstractNode[Any]]) -> None:
-        super().__init__()
+    def __init__(self, dependencies: list[AbstractNode[Any]], name: str | None = None) -> None:
+        super().__init__(name)
         self._dependencies = dependencies
 
     @property
@@ -89,8 +98,13 @@ class DerivedNode(AbstractNode[T], abc.ABC, Generic[T]):
 
 
 class LambdaCalcNode(DerivedNode[T], Generic[T]):
-    def __init__(self, calculation: Callable[[list[T]], T], dependencies: list[AbstractNode[Any]]):
-        super().__init__(dependencies=dependencies)
+    def __init__(
+        self,
+        calculation: Callable[[list[T]], T],
+        dependencies: list[AbstractNode[Any]],
+        name: str | None = None,
+    ):
+        super().__init__(dependencies=dependencies, name=name)
         self._calculation = calculation
 
     def calculate(self, inputs: list[T]) -> T:
@@ -100,6 +114,8 @@ class LambdaCalcNode(DerivedNode[T], Generic[T]):
         return str(self)
 
     def __str__(self) -> str:
+        if self._has_readable_name:
+            return self._name
         return "LambdaCalcNode()"
 
 
@@ -118,7 +134,6 @@ class Network:
         self._initial_values = initial_values or values
 
     def change_value(self, node: InputNode[T], new_value: T) -> "Network":
-        # Get existing value by ID and replace it by the result of set_value
         new_value = node.validate(new_value)
         old_value = self._values.get(node)
         values = self._values.set(node, new_value)
@@ -154,8 +169,15 @@ class Network:
             ", ", [str(node) + ": " + (str(self._values.get(node))) for node in self._nodes]
         )
         if self._changes:
-            return f"Network({nodes_and_values}, changes={self._changes})"
+            changes = str.join(", ", [str(node) for node in self._changes])
+            return f"Network({nodes_and_values} | changes={changes})"
         return f"Network({nodes_and_values})"
+
+    def dump(self) -> dict[str, Any]:
+        result = {}
+        for node in self._nodes:
+            result[str(node._name)] = self._values.get(node)
+        return result
 
 
 class NetworkBuilder:
@@ -163,16 +185,19 @@ class NetworkBuilder:
         self.nodes: list[AbstractNode[Any]] = []
         self.initial_values: dict[AbstractNode[Any], Any] = {}
 
-    def add_input(self, value: T) -> InputNode[T]:
-        node: InputNode[T] = InputNode()
+    def add_input(self, value: T, name: str | None = None) -> InputNode[T]:
+        node: InputNode[T] = InputNode(name=name)
         self.nodes.append(node)
         self.initial_values[node] = value
         return node
 
     def add_calculation(
-        self, calculation: Callable[[list[T]], T], dependencies: list[AbstractNode[Any]]
+        self,
+        calculation: Callable[[list[T]], T],
+        dependencies: list[AbstractNode[Any]],
+        name: str | None = None,
     ) -> LambdaCalcNode[T]:
-        node = LambdaCalcNode(calculation, dependencies)
+        node = LambdaCalcNode(calculation, dependencies, name=name)
         self.initial_values[node] = node.calculate(
             [self.initial_values[dep] for dep in dependencies]
         )
@@ -208,9 +233,9 @@ class NetworkBuilder:
 
 if __name__ == "__main__":
     new_net = NetworkBuilder()
-    val1 = new_net.add_input(1)
-    val2 = new_net.add_input(2)
-    val3 = new_net.add_calculation(lambda x: x[0] + x[1], [val1, val2])
+    val1 = new_net.add_input(1, name="input1")
+    val2 = new_net.add_input(2, name="input2")
+    val3 = new_net.add_calculation(lambda x: x[0] + x[1], [val1, val2], name="sum")
 
     network = new_net.build()
     network = network.commit()
