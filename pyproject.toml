@@ -68,6 +68,7 @@ ignore = [
     "UP015", # Unnecessary open mode parameters
     "PLC1901", # compare-to-empty-string
     "PLR0913", # Too many arguments to function call
+    "S311",  # pseudo-random generators are not suitable for cryptographic purposes - we use them to randomize the data
 ]
 
 [tool.isort]

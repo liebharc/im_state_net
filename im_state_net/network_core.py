@@ -84,7 +84,7 @@ class Network:
         if old_value != new_value:
             changes = self._changes.add(node)
         else:
-            changes = self._changes.remove(node)
+            changes = self._changes.discard(node)
         return Network(self._nodes, values, changes, self._initial_values)
 
     def get_value(self, node: AbstractNode[T]) -> T:

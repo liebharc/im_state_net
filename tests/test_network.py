@@ -58,6 +58,12 @@ def test_change_min_max_node():
     assert network.get_value(network.val2) == 5
 
 
+def test_change_to_same_value():
+    network = SimpleSumNetwork()
+    network.set_value(network.val1, 1)
+    assert network.number_of_changes() == 0
+
+
 def test_reverting_changes():
     network = SimpleSumNetwork()
     value1 = network.get_value(network.val1)
