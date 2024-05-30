@@ -38,7 +38,7 @@ class InputNode(AbstractNode[T], Generic[T]):
         return value
 
 
-class DerivedNode(AbstractNode[T], abc.ABC, Generic[T]):
+class DerivedNode(AbstractNode[T], Generic[T]):
     def __init__(self, dependencies: list[AbstractNode[Any]], name: str | None = None) -> None:
         super().__init__(name)
         self._dependencies = dependencies

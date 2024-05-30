@@ -1,5 +1,6 @@
 from typing import TypeVar
 
+from im_state_net.additional_base_classes import BinaryCalcNode
 from im_state_net.additional_nodes import (
     LambdaCalcNode,
     NumericMinMaxNode,
@@ -10,17 +11,23 @@ from im_state_net.network_core import AbstractNode, InputNode, NetworkBuilder
 
 T = TypeVar("T")
 
+class MyBinaryNode(BinaryCalcNode[str, float, int]): 
+    def _calculation(self, value1: float, value2: int) -> str:
+        return str(value1 + value2)
+
 
 class SimpleSumNetwork:
     def __init__(self):
         builder = NetworkBuilder()
         self.val1 = builder.add_input(InputNode(), 1)
         self.val2 = builder.add_input(NumericMinMaxNode(1, 5), 2)
+        self.val3 = builder.add_input(InputNode(), 3.0)
         self.calc = builder.add_calculation(
             LambdaCalcNode(lambda x: x[0] + x[1], [self.val1, self.val2])
         )
         self.sum = builder.add_calculation(SumNode([self.val1, self.val2]))
         self.product = builder.add_calculation(ProductNode([self.val1, self.val2]))
+        self.strnode = builder.add_calculation(MyBinaryNode(self.val3, self.val1))
         self.network = builder.build()
 
     def get_value(self, node: AbstractNode[T]) -> T:
@@ -46,6 +53,7 @@ def test_valid_network():
     assert network.get_value(network.calc) == 5
     assert network.get_value(network.sum) == 5
     assert network.get_value(network.product) == 6
+    assert network.get_value(network.strnode) == "6.0"
 
 
 def test_change_min_max_node():
