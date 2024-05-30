@@ -12,15 +12,16 @@ class AbstractNode(abc.ABC, Generic[T]):
 
     def __init__(self, name: str | None) -> None:
         super().__init__()
-        self._has_readable_name = False
-        if name:
-            self._name = name
-            self._has_readable_name = True
-        else:
-            self._name = str(uuid.uuid4())
+        self._name = name or str(uuid.uuid4())
 
     @property
     def name(self) -> str:
+        return self._name
+
+    def __repr__(self) -> str:
+        return str(self)
+
+    def __str__(self) -> str:
         return self._name
 
 
@@ -35,14 +36,6 @@ class InputNode(AbstractNode[T], Generic[T]):
         if the value is invalid.
         """
         return value
-
-    def __repr__(self) -> str:
-        return str(self)
-
-    def __str__(self) -> str:
-        if self._has_readable_name:
-            return self._name
-        return "InputNode()"
 
 
 class DerivedNode(AbstractNode[T], abc.ABC, Generic[T]):

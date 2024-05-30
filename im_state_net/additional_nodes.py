@@ -21,14 +21,6 @@ class LambdaCalcNode(DerivedNode[T], Generic[T]):
     def calculate(self, inputs: list[T]) -> T:
         return self._calculation(inputs)
 
-    def __repr__(self) -> str:
-        return str(self)
-
-    def __str__(self) -> str:
-        if self._has_readable_name:
-            return self._name
-        return "LambdaCalcNode()"
-
 
 class SumNode(DerivedNode[U], Generic[U]):
     def __init__(self, dependencies: list[AbstractNode[Any]], name: str | None = None) -> None:
@@ -36,14 +28,6 @@ class SumNode(DerivedNode[U], Generic[U]):
 
     def calculate(self, inputs: list[Any]) -> U:
         return cast(U, sum(inputs))
-
-    def __repr__(self) -> str:
-        return str(self)
-
-    def __str__(self) -> str:
-        if self._has_readable_name:
-            return self._name
-        return "SumNode()"
 
 
 class ProductNode(DerivedNode[U], Generic[U]):
@@ -55,14 +39,6 @@ class ProductNode(DerivedNode[U], Generic[U]):
         for value in inputs:
             result *= value
         return result
-
-    def __repr__(self) -> str:
-        return str(self)
-
-    def __str__(self) -> str:
-        if self._has_readable_name:
-            return self._name
-        return "ProductNode()"
 
 
 class NumericMinMaxNode(InputNode[U]):
@@ -88,8 +64,3 @@ class NumericMinMaxNode(InputNode[U]):
 
     def __repr__(self) -> str:
         return str(self)
-
-    def __str__(self) -> str:
-        if self._has_readable_name:
-            return self._name
-        return f"NumericMinMaxNode({self._min_value}, {self._max_value})"
