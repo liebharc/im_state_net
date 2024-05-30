@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, cast
 
 from im_state_net.network_core import AbstractNode, DerivedNode, InputNode
 
@@ -28,6 +28,41 @@ class LambdaCalcNode(DerivedNode[T], Generic[T]):
         if self._has_readable_name:
             return self._name
         return "LambdaCalcNode()"
+
+
+class SumNode(DerivedNode[U], Generic[U]):
+    def __init__(self, dependencies: list[AbstractNode[Any]], name: str | None = None) -> None:
+        super().__init__(dependencies=dependencies, name=name)
+
+    def calculate(self, inputs: list[Any]) -> U:
+        return cast(U, sum(inputs))
+
+    def __repr__(self) -> str:
+        return str(self)
+
+    def __str__(self) -> str:
+        if self._has_readable_name:
+            return self._name
+        return "SumNode()"
+
+
+class ProductNode(DerivedNode[U], Generic[U]):
+    def __init__(self, dependencies: list[AbstractNode[Any]], name: str | None = None) -> None:
+        super().__init__(dependencies=dependencies, name=name)
+
+    def calculate(self, inputs: list[Any]) -> U:
+        result = 1
+        for value in inputs:
+            result *= value
+        return result
+
+    def __repr__(self) -> str:
+        return str(self)
+
+    def __str__(self) -> str:
+        if self._has_readable_name:
+            return self._name
+        return "ProductNode()"
 
 
 class NumericMinMaxNode(InputNode[U]):

@@ -1,6 +1,11 @@
 from typing import TypeVar
 
-from im_state_net.additional_nodes import LambdaCalcNode
+from im_state_net.additional_nodes import (
+    LambdaCalcNode,
+    NumericMinMaxNode,
+    ProductNode,
+    SumNode,
+)
 from im_state_net.network_core import AbstractNode, InputNode, NetworkBuilder
 
 T = TypeVar("T")
@@ -10,10 +15,12 @@ class SimpleSumNetwork:
     def __init__(self):
         builder = NetworkBuilder()
         self.val1 = builder.add_input(InputNode(), 1)
-        self.val2 = builder.add_input(InputNode(), 2)
+        self.val2 = builder.add_input(NumericMinMaxNode(1, 5), 2)
         self.calc = builder.add_calculation(
             LambdaCalcNode(lambda x: x[0] + x[1], [self.val1, self.val2])
         )
+        self.sum = builder.add_calculation(SumNode([self.val1, self.val2]))
+        self.product = builder.add_calculation(ProductNode([self.val1, self.val2]))
         self.network = builder.build()
 
     def get_value(self, node: AbstractNode[T]) -> T:
@@ -37,6 +44,18 @@ def test_valid_network():
     network.commit()
 
     assert network.get_value(network.calc) == 5
+    assert network.get_value(network.sum) == 5
+    assert network.get_value(network.product) == 6
+
+
+def test_change_min_max_node():
+    network = SimpleSumNetwork()
+    assert network.get_value(network.val2) == 2
+
+    network.set_value(network.val2, 6)
+    network.commit()
+
+    assert network.get_value(network.val2) == 5
 
 
 def test_reverting_changes():
