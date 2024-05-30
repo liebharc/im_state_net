@@ -1,7 +1,7 @@
 import abc
 import uuid
 from collections.abc import Callable
-from typing import TypeVar
+from typing import Any, Generic, TypeVar
 
 from pyrsistent import pset, pvector
 from pyrsistent.typing import PSet, PVector
@@ -9,7 +9,7 @@ from pyrsistent.typing import PSet, PVector
 T = TypeVar("T")
 
 
-class AbstractNode(abc.ABC):
+class AbstractNode(abc.ABC, Generic[T]):
 
     def __init__(self) -> None:
         super().__init__()
@@ -25,10 +25,7 @@ class AbstractNode(abc.ABC):
         pass
 
 
-TInputNode = TypeVar("TInputNode", bound="InputNode")
-
-
-class InputNode(AbstractNode):
+class InputNode(AbstractNode[T], Generic[T]):
     def __init__(self, value: T) -> None:
         super().__init__()
         self._value = value
@@ -38,23 +35,19 @@ class InputNode(AbstractNode):
         return self._value
 
     @abc.abstractmethod
-    def change_value(self: TInputNode, new_value: T) -> TInputNode:
+    def change_value(self, new_value: T) -> "InputNode[T]":
         pass
 
 
-TValueNode = TypeVar("TValueNode", bound="ValueNode")
-
-
-class ValueNode(InputNode):
+class ValueNode(InputNode[T], Generic[T]):
     def __init__(self, value: T) -> None:
-        super().__init__()
-        self._value = value
+        super().__init__(value)
 
     @property
     def value(self) -> T:
         return self._value
 
-    def change_value(self: TValueNode, new_value: T) -> TValueNode:
+    def change_value(self, new_value: T) -> "ValueNode[T]":
         copy = ValueNode(new_value)
         copy._id = self._id
         return copy
@@ -66,24 +59,24 @@ class ValueNode(InputNode):
         return f"ValueNode({self._value})"
 
 
-TNumericMinMaxNode = TypeVar("TNumericMinMaxNode", bound="NumericMinMaxNode")
+U = TypeVar("U", int, float)
 
 
-class NumericMinMaxNode(ValueNode):
-    def __init__(self, value: T, min_value: T, max_value: T) -> None:
-        super().__init__(value)
-        self._min_value = min_value
-        self._max_value = max_value
+class NumericMinMaxNode(ValueNode[U]):
+    def __init__(self, value: U, min_value: U, max_value: U) -> None:
+        super().__init__(value)  # type: ignore
+        self._min_value: U = min_value
+        self._max_value: U = max_value
 
     @property
-    def min_value(self) -> T:
+    def min_value(self) -> U:
         return self._min_value
 
     @property
-    def max_value(self) -> T:
+    def max_value(self) -> U:
         return self._max_value
 
-    def change_value(self: TNumericMinMaxNode, new_value: T) -> TNumericMinMaxNode:
+    def change_value(self, new_value: U) -> "NumericMinMaxNode[U]":
         if new_value < self._min_value:
             new_value = self._min_value
         elif new_value > self._max_value:
@@ -99,54 +92,52 @@ class NumericMinMaxNode(ValueNode):
         return f"NumericMinMaxNode({self._value}, {self._min_value}, {self._max_value})"
 
 
-TDerivedNode = TypeVar("TDerivedNode", bound="DerivedNode")
-
-
-class DerivedNode(ValueNode):
+class DerivedNode(AbstractNode[T], Generic[T]):
     def __init__(
-        self, value: T, dependencies: list[AbstractNode], dependency_ids: PSet[uuid.UUID] = None
+        self, dependencies: list[AbstractNode[Any]], dependency_ids: PSet[uuid.UUID] | None = None
     ) -> None:
-        super().__init__(value)
+        super().__init__()
         self._dependencies = dependencies
         self.dependency_ids = dependency_ids or pset([dep.id for dep in dependencies])
 
     @property
-    def dependencies(self) -> list[AbstractNode]:
+    def dependencies(self) -> list[AbstractNode[Any]]:
         return self._dependencies
 
     @abc.abstractmethod
     def force_calculation(self) -> None:
         pass
 
+    @abc.abstractmethod
+    def reset(self, dependencies: list[AbstractNode[Any]]) -> "DerivedNode[T]":
+        pass
 
-TLambdaCalcNode = TypeVar("TLambdaCalcNode", bound="LambdaCalcNode")
 
-
-class LambdaCalcNode(DerivedNode):
+class LambdaCalcNode(DerivedNode[T], Generic[T]):
     def __init__(
         self,
         calculation: Callable[[list[T]], T],
-        dependencies: list[AbstractNode],
-        dependency_ids: PSet[uuid.UUID] = None,
+        dependencies: list[AbstractNode[Any]],
+        dependency_ids: PSet[uuid.UUID] | None = None,
     ):
         super().__init__(dependencies=dependencies, dependency_ids=dependency_ids)
         self._calculation = calculation
         self._value: T | None = None
 
     @property
-    def dependencies(self):
+    def dependencies(self) -> list[AbstractNode[Any]]:
         return self._dependencies
 
     @property
-    def value(self):
+    def value(self) -> T:
         if self._value is None:
             self.force_calculation()
-        return self._value
+        return self._value  # type: ignore
 
-    def force_calculation(self):
+    def force_calculation(self) -> None:
         self._value = self._calculation([node.value for node in self._dependencies])
 
-    def reset(self: TLambdaCalcNode, dependencies: list[AbstractNode]) -> TLambdaCalcNode:
+    def reset(self, dependencies: list[AbstractNode[Any]]) -> "LambdaCalcNode[T]":
         return LambdaCalcNode(self._calculation, dependencies, self.dependency_ids)
 
     def __repr__(self) -> str:
@@ -156,21 +147,18 @@ class LambdaCalcNode(DerivedNode):
         return f"LambdaCalcNode({self._value})"
 
 
-TNetwork = TypeVar("TNetwork", bound="Network")
-
-
 class Network:
-    def __init__(self, nodes: PVector[AbstractNode], changes: PSet[uuid.UUID] = None):
+    def __init__(self, nodes: PVector[AbstractNode[Any]], changes: PSet[uuid.UUID] | None = None):
         self.nodes = nodes
         self.changes = changes or pset()
 
-    def change_value(self: TNetwork, node: ValueNode, new_value: T) -> TNetwork:
+    def change_value(self, node: ValueNode[T], new_value: T) -> "Network":
         # Get existing value by ID and replace it by the result of set_value
         index = self.nodes.index(node)
         new_node = node.change_value(new_value)
         return Network(self.nodes.set(index, new_node), self.changes.add(new_node.id))
 
-    def commit(self: TNetwork, eager: bool = False) -> TNetwork:
+    def commit(self, eager: bool = False) -> "Network":
         nodes = self.nodes
         changes = self.changes
         nodes_by_id = {node.id: node for node in nodes}
@@ -187,40 +175,40 @@ class Network:
                     changes = changes.add(updated_node.id)
         return Network(nodes, pset())
 
-    def eager_commit(self: TNetwork) -> TNetwork:
+    def eager_commit(self) -> "Network":
         return self.commit(eager=True)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self)
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.changes:
             return f"Network({self.nodes}, changes={self.changes})"
         return f"Network({self.nodes})"
 
 
 class NetworkBuilder:
-    def __init__(self):
-        self.nodes = []
+    def __init__(self) -> None:
+        self.nodes: list[AbstractNode[Any]] = []
 
-    def add_value(self, value: T) -> ValueNode:
+    def add_value(self, value: T) -> ValueNode[T]:
         node = ValueNode(value)
         self.nodes.append(node)
         return node
 
     def add_calculation(
-        self, calculation: Callable[[list[AbstractNode]], T], dependencies: list[AbstractNode]
-    ) -> LambdaCalcNode:
+        self, calculation: Callable[[list[T]], T], dependencies: list[AbstractNode[Any]]
+    ) -> LambdaCalcNode[T]:
         node = LambdaCalcNode(calculation, dependencies)
         self.nodes.append(node)
         return node
 
-    def _sorted_nodes(self):
+    def _sorted_nodes(self) -> list[AbstractNode[Any]]:
         sorted_nodes = []
         visited = set()
         visiting = set()
 
-        def visit(node):
+        def visit(node: AbstractNode[Any]) -> None:
             if node in visiting:
                 raise ValueError("Circular dependency detected")
 
@@ -238,7 +226,7 @@ class NetworkBuilder:
 
         return sorted_nodes
 
-    def build(self):
+    def build(self) -> Network:
         return Network(pvector(self._sorted_nodes()))
 
 
