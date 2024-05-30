@@ -1,5 +1,7 @@
 import pytest
+
 from im_state_net.main import Network, NetworkBuilder, ValueNode
+
 
 def test_valid_network():
     builder = NetworkBuilder()

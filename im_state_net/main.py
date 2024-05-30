@@ -25,10 +25,27 @@ class AbstractNode(abc.ABC):
         pass
 
 
+TInputNode = TypeVar("TInputNode", bound="InputNode")
+
+
+class InputNode(AbstractNode):
+    def __init__(self, value: T) -> None:
+        super().__init__()
+        self._value = value
+
+    @property
+    def value(self) -> T:
+        return self._value
+
+    @abc.abstractmethod
+    def change_value(self: TInputNode, new_value: T) -> TInputNode:
+        pass
+
+
 TValueNode = TypeVar("TValueNode", bound="ValueNode")
 
 
-class ValueNode(AbstractNode):
+class ValueNode(InputNode):
     def __init__(self, value: T) -> None:
         super().__init__()
         self._value = value
@@ -49,19 +66,70 @@ class ValueNode(AbstractNode):
         return f"ValueNode({self._value})"
 
 
-TCalcNode = TypeVar("TCalcNode", bound="CalcNode")
+TNumericMinMaxNode = TypeVar("TNumericMinMaxNode", bound="NumericMinMaxNode")
 
 
-class CalcNode(AbstractNode):
+class NumericMinMaxNode(ValueNode):
+    def __init__(self, value: T, min_value: T, max_value: T) -> None:
+        super().__init__(value)
+        self._min_value = min_value
+        self._max_value = max_value
+
+    @property
+    def min_value(self) -> T:
+        return self._min_value
+
+    @property
+    def max_value(self) -> T:
+        return self._max_value
+
+    def change_value(self: TNumericMinMaxNode, new_value: T) -> TNumericMinMaxNode:
+        if new_value < self._min_value:
+            new_value = self._min_value
+        elif new_value > self._max_value:
+            new_value = self._max_value
+        copy = NumericMinMaxNode(new_value, self._min_value, self._max_value)
+        copy._id = self._id
+        return copy
+
+    def __repr__(self) -> str:
+        return str(self)
+
+    def __str__(self) -> str:
+        return f"NumericMinMaxNode({self._value}, {self._min_value}, {self._max_value})"
+
+
+TDerivedNode = TypeVar("TDerivedNode", bound="DerivedNode")
+
+
+class DerivedNode(ValueNode):
+    def __init__(
+        self, value: T, dependencies: list[AbstractNode], dependency_ids: PSet[uuid.UUID] = None
+    ) -> None:
+        super().__init__(value)
+        self._dependencies = dependencies
+        self.dependency_ids = dependency_ids or pset([dep.id for dep in dependencies])
+
+    @property
+    def dependencies(self) -> list[AbstractNode]:
+        return self._dependencies
+
+    @abc.abstractmethod
+    def force_calculation(self) -> None:
+        pass
+
+
+TLambdaCalcNode = TypeVar("TLambdaCalcNode", bound="LambdaCalcNode")
+
+
+class LambdaCalcNode(DerivedNode):
     def __init__(
         self,
         calculation: Callable[[list[T]], T],
         dependencies: list[AbstractNode],
         dependency_ids: PSet[uuid.UUID] = None,
     ):
-        super().__init__()
-        self._dependencies = dependencies
-        self.dependency_ids = dependency_ids or pset([dep.id for dep in dependencies])
+        super().__init__(dependencies=dependencies, dependency_ids=dependency_ids)
         self._calculation = calculation
         self._value: T | None = None
 
@@ -78,14 +146,14 @@ class CalcNode(AbstractNode):
     def force_calculation(self):
         self._value = self._calculation([node.value for node in self._dependencies])
 
-    def reset(self: TCalcNode, dependencies: list[AbstractNode]) -> TCalcNode:
-        return CalcNode(self._calculation, dependencies, self.dependency_ids)
+    def reset(self: TLambdaCalcNode, dependencies: list[AbstractNode]) -> TLambdaCalcNode:
+        return LambdaCalcNode(self._calculation, dependencies, self.dependency_ids)
 
     def __repr__(self) -> str:
         return str(self)
 
     def __str__(self) -> str:
-        return f"CalcNode({self._value})"
+        return f"LambdaCalcNode({self._value})"
 
 
 TNetwork = TypeVar("TNetwork", bound="Network")
@@ -107,7 +175,7 @@ class Network:
         changes = self.changes
         nodes_by_id = {node.id: node for node in nodes}
         for i, node in enumerate(nodes):
-            if isinstance(node, CalcNode):
+            if isinstance(node, DerivedNode):
                 any_deps_changed = not self.changes.isdisjoint(node.dependency_ids)
                 if any_deps_changed:
                     updated_dependencies = [nodes_by_id[dep.id] for dep in node.dependencies]
@@ -142,8 +210,8 @@ class NetworkBuilder:
 
     def add_calculation(
         self, calculation: Callable[[list[AbstractNode]], T], dependencies: list[AbstractNode]
-    ) -> CalcNode:
-        node = CalcNode(calculation, dependencies)
+    ) -> LambdaCalcNode:
+        node = LambdaCalcNode(calculation, dependencies)
         self.nodes.append(node)
         return node
 
@@ -158,7 +226,7 @@ class NetworkBuilder:
 
             if node not in visited:
                 visiting.add(node)
-                if isinstance(node, CalcNode):
+                if isinstance(node, LambdaCalcNode):
                     for dependency in node.dependencies:
                         visit(dependency)
                 visiting.remove(node)
