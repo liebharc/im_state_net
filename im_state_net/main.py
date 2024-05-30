@@ -47,7 +47,7 @@ if __name__ == "__main__":
         network = network.change_value(node, value)
         change += 1
         if change >= batch_size:
-            network = network.commit()
+            network, _changes = network.commit()
             number_of_commits += 1
             change = 0
 

@@ -83,9 +83,9 @@ class Network:
     def get_value(self, node: AbstractNode[T]) -> T:
         return cast(T, self._values[node])
 
-    def commit(self) -> "Network":
+    def commit(self) -> tuple["Network", set[AbstractNode[Any]]]:
         if len(self._changes) == 0:
-            return self
+            return self, set()
         nodes = self._nodes
         values = self._values
         changes = self._changes
@@ -98,7 +98,7 @@ class Network:
                     values = values.set(node, new_value)
                     if old_value != new_value:
                         changes = changes.add(node)
-        return Network(nodes, values, pset(), values)
+        return Network(nodes, values, pset(), values), set(changes)
 
     def is_consistent(self) -> bool:
         """

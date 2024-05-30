@@ -38,7 +38,7 @@ class SimpleSumNetwork:
         self.network = self.network.change_value(node, value)
 
     def commit(self) -> None:
-        self.network = self.network.commit()
+        self.network, _changes = self.network.commit()
 
     def number_of_changes(self) -> int:
         return len(self.network._changes)
@@ -104,6 +104,7 @@ def test_example():
     assert network.is_consistent() == True
 
     # or executed them and calculates derived values
-    network = network.change_value(val1, 2).commit()
+    network, changes = network.change_value(val1, 2).commit()
     assert network.is_consistent() == True
     assert network.get_value(result) == 4
+    assert changes == set([val1, result])

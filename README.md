@@ -20,9 +20,10 @@ network = network.change_value(val1, 1)
 assert network.is_consistent() == True
 
 # or executed them and calculates derived values
-network = network.change_value(val1, 2).commit()
+network, changes = network.change_value(val1, 2).commit()
 assert network.is_consistent() == True
 assert network.get_value(result) == 4
+assert changes == set([val1, result])
 ```
 
 Use Case: This solution is particularly beneficial when dealing with settings that are interdependent and time-consuming to apply. This could be due to the need to transmit them to hardware, which then adjusts electrical or mechanical parameters. In such scenarios, the overhead associated with this solution is justified by the reduction in the number of changes required.
