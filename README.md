@@ -2,7 +2,7 @@
 
 Small example on how to create a persistent network of state or calculation nodes in Python:
 
-```
+```python
 builder = NetworkBuilder()
 val1 = builder.add_input(InputNode(), 1)
 val2 = builder.add_input(InputNode(), 2)
@@ -11,13 +11,16 @@ network = builder.build()
 
 assert network.get_value(result) == 3
 
+# Changes are detected
 network = network.change_value(val1, 2)
-assert network.is_consistent() == False  # Changes are detected
+assert network.is_consistent() == False
 
-network = network.change_value(val1, 1)  # The network detects if changes get reverted
+# The network detects if changes get reverted
+network = network.change_value(val1, 1)
 assert network.is_consistent() == True
 
-network = network.change_value(val1, 2).commit()  # or executed them and calculates derived values
+# or executed them and calculates derived values
+network = network.change_value(val1, 2).commit()
 assert network.is_consistent() == True
 assert network.get_value(result) == 4
 ```
