@@ -1,28 +1,28 @@
 # im-state-net
 
-Small example on how to create a persistent network of state or calculation nodes in Python:
+Small example on how to create a persistent graph of state or calculation nodes in Python:
 
 ```python
-builder = NetworkBuilder()
+builder = StateBuilder()
 val1 = builder.add_input(InputNode(), 1)
 val2 = builder.add_input(InputNode(), 2)
 result = builder.add_calculation(LambdaCalcNode(lambda x: x[0] + x[1], [val1, val2]))
-network = builder.build()
+state = builder.build()
 
-assert network.get_value(result) == 3
+assert state.get_value(result) == 3
 
+state = state.change_value(val1, 2)
 # Changes are detected
-network = network.change_value(val1, 2)
-assert network.is_consistent() == False
+assert state.is_consistent() == False
 
-# The network detects if changes get reverted
-network = network.change_value(val1, 1)
-assert network.is_consistent() == True
+# The state detects if changes get reverted
+state = state.change_value(val1, 1)
+assert state.is_consistent() == True
 
-# or executed them and calculates derived values
-network, changes = network.change_value(val1, 2).commit()
-assert network.is_consistent() == True
-assert network.get_value(result) == 4
+# or calculates derived values on commit
+state, changes = state.change_value(val1, 2).commit()
+assert state.is_consistent() == True
+assert state.get_value(result) == 4
 assert changes == set([val1, result])
 ```
 

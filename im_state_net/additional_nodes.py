@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from typing import Any, Generic, TypeVar, cast
 
-from im_state_net.network_core import AbstractNode, DerivedNode, InputNode
+from im_state_net.state_core import AbstractNode, DerivedNode, InputNode
 
 U = TypeVar("U", int, float)
 
@@ -44,7 +44,7 @@ class ProductNode(DerivedNode[U], Generic[U]):
 class PlaceholderNode(DerivedNode[U], Generic[U]):
     """
     A placeholder node that can be assigned a value later.
-    It gives more flexibility to build a network, but
+    It gives more flexibility to build a state, but
     creates the risk of building circular dependencies.
     """
 
@@ -65,10 +65,10 @@ class PlaceholderNode(DerivedNode[U], Generic[U]):
             raise ValueError("Placeholder node has not been assigned a value yet")
         return self._node.calculate(inputs)
 
-    def on_compile(self) -> None:
+    def on_build(self) -> None:
         if self._node is None:
             raise ValueError("Placeholder node has not been assigned a value yet")
-        self._node.on_compile()
+        self._node.on_build()
 
 
 class NumericMinMaxNode(InputNode[U]):

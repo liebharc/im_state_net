@@ -3,14 +3,14 @@ import time
 from typing import Any, TypeVar
 
 from im_state_net.additional_nodes import LambdaCalcNode, ProductNode, SumNode
-from im_state_net.network_core import AbstractNode, InputNode, NetworkBuilder
+from im_state_net.state_core import AbstractNode, InputNode, StateBuilder
 
 T = TypeVar("T")
 
 if __name__ == "__main__":
     start_time = time.time()
 
-    builder = NetworkBuilder()
+    builder = StateBuilder()
     nodes: list[AbstractNode[Any]] = []
     for i in range(1000):
         if i % 5 == 0:
@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
     inputs = {node: random.randint(0, 100) for node in nodes if isinstance(node, InputNode)}
 
-    network = builder.build()
+    state = builder.build()
 
     end_time = time.time()
     print(f"Setup time: {end_time - start_time} seconds")
@@ -44,10 +44,10 @@ if __name__ == "__main__":
 
     change = 0
     for node, value in inputs.items():
-        network = network.change_value(node, value)
+        state = state.change_value(node, value)
         change += 1
         if change >= batch_size:
-            network, _changes = network.commit()
+            state, _changes = state.commit()
             number_of_commits += 1
             change = 0
 

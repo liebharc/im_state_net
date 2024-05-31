@@ -1,7 +1,7 @@
 import abc
 from typing import Any, Generic, TypeVar
 
-from im_state_net.network_core import AbstractNode, DerivedNode
+from im_state_net.state_core import AbstractNode, DerivedNode
 
 TOUT = TypeVar("TOUT")
 

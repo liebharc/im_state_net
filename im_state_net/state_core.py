@@ -14,10 +14,10 @@ class AbstractNode(abc.ABC, Generic[T]):
         super().__init__()
         self._name = name or str(uuid.uuid4())
 
-    def on_compile(self) -> None:
+    def on_build(self) -> None:
         """
-        Called when the network is compiled,
-        a node can be part of multiple networks.
+        Called when the state is build,
+        a node can be part of multiple states.
         """
 
     @property
@@ -62,7 +62,7 @@ class DerivedNode(AbstractNode[T], Generic[T]):
         """
 
 
-class Network:
+class State:
     def __init__(
         self,
         nodes: PVector[AbstractNode[Any]],
@@ -76,7 +76,7 @@ class Network:
         # initial values are the values since the last commit
         self._initial_values = initial_values or values
 
-    def change_value(self, node: InputNode[T], new_value: T) -> "Network":
+    def change_value(self, node: InputNode[T], new_value: T) -> "State":
         new_value = node.validate(new_value)
         old_value = self._initial_values.get(node)
         values = self._values.set(node, new_value)
@@ -84,12 +84,12 @@ class Network:
             changes = self._changes.add(node)
         else:
             changes = self._changes.discard(node)
-        return Network(self._nodes, values, changes, self._initial_values)
+        return State(self._nodes, values, changes, self._initial_values)
 
     def get_value(self, node: AbstractNode[T]) -> T:
         return cast(T, self._values[node])
 
-    def commit(self) -> tuple["Network", set[AbstractNode[Any]]]:
+    def commit(self) -> tuple["State", set[AbstractNode[Any]]]:
         if len(self._changes) == 0:
             return self, set()
         nodes = self._nodes
@@ -104,11 +104,11 @@ class Network:
                     values = values.set(node, new_value)
                     if old_value != new_value:
                         changes = changes.add(node)
-        return Network(nodes, values, pset(), values), set(changes)
+        return State(nodes, values, pset(), values), set(changes)
 
     def is_consistent(self) -> bool:
         """
-        A consistent network is a network which has no pending changes.
+        A consistent state is a state which has no pending changes.
         In other words: It has no changes since the last commit.
         """
         return len(self._changes) == 0
@@ -122,8 +122,8 @@ class Network:
         )
         if self._changes:
             changes = str.join(", ", [str(node) for node in self._changes])
-            return f"Network({nodes_and_values} | changes={changes})"
-        return f"Network({nodes_and_values})"
+            return f"State({nodes_and_values} | changes={changes})"
+        return f"State({nodes_and_values})"
 
     def dump(self) -> dict[str, Any]:
         result = {}
@@ -136,7 +136,7 @@ TDerivedNode = TypeVar("TDerivedNode", bound=DerivedNode[Any])
 TInputNode = TypeVar("TInputNode", bound=InputNode[Any])
 
 
-class NetworkBuilder:
+class StateBuilder:
     def __init__(self) -> None:
         self.nodes: list[AbstractNode[Any]] = []
         self.initial_values: dict[AbstractNode[Any], Any] = {}
@@ -176,11 +176,11 @@ class NetworkBuilder:
 
         return sorted_nodes
 
-    def build(self) -> Network:
+    def build(self) -> State:
         for node in self.nodes:
             if isinstance(node, DerivedNode):
-                node.on_compile()
+                node.on_build()
                 self.initial_values[node] = node.calculate(
                     [self.initial_values[dep] for dep in node.dependencies]
                 )
-        return Network(pvector(self._sorted_nodes()), pmap(self.initial_values))
+        return State(pvector(self._sorted_nodes()), pmap(self.initial_values))

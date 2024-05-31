@@ -1,12 +1,12 @@
 import pytest
 
 from im_state_net.additional_nodes import PlaceholderNode, ProductNode, SumNode
-from im_state_net.network_core import InputNode, NetworkBuilder
+from im_state_net.state_core import InputNode, StateBuilder
 
 
 def test_unset_placeholder():
 
-    builder = NetworkBuilder()
+    builder = StateBuilder()
     val1 = builder.add_input(InputNode(), 1)
     val2 = builder.add_input(InputNode(), 2)
     builder.add_calculation(PlaceholderNode())
@@ -15,22 +15,22 @@ def test_unset_placeholder():
         builder.build()
 
 
-def test_valid_network():
+def test_valid_state():
 
-    builder = NetworkBuilder()
+    builder = StateBuilder()
     val1 = builder.add_input(InputNode(), 1)
     val2 = builder.add_input(InputNode(), 2)
     placeholder = builder.add_calculation(PlaceholderNode())
     result = builder.add_calculation(SumNode([placeholder, val2]))
     placeholder.assign(ProductNode([val1, val2]))
-    network = builder.build()
+    state = builder.build()
 
-    assert network.get_value(result) == 4
+    assert state.get_value(result) == 4
 
 
 def test_direct_circular_dependency():
 
-    builder = NetworkBuilder()
+    builder = StateBuilder()
     val1 = builder.add_input(InputNode(), 1)
     placeholder = builder.add_calculation(PlaceholderNode())
     placeholder.assign(ProductNode([val1, placeholder]))
@@ -40,7 +40,7 @@ def test_direct_circular_dependency():
 
 def test_indirect_circular_dependency():
 
-    builder = NetworkBuilder()
+    builder = StateBuilder()
     val1 = builder.add_input(InputNode(), 1)
     val2 = builder.add_input(InputNode(), 2)
     placeholder = builder.add_calculation(PlaceholderNode())
