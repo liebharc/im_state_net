@@ -23,19 +23,19 @@ class LambdaCalcNode(DerivedNode[T], Generic[T]):
 
 
 class SumNode(DerivedNode[U], Generic[U]):
-    def __init__(self, dependencies: list[AbstractNode[Any]], name: str | None = None) -> None:
+    def __init__(self, dependencies: list[AbstractNode[U]], name: str | None = None) -> None:
         super().__init__(dependencies=dependencies, name=name)
 
-    def calculate(self, inputs: list[Any]) -> U:
+    def calculate(self, inputs: list[U]) -> U:
         return cast(U, sum(inputs))
 
 
 class ProductNode(DerivedNode[U], Generic[U]):
-    def __init__(self, dependencies: list[AbstractNode[Any]], name: str | None = None) -> None:
+    def __init__(self, dependencies: list[AbstractNode[U]], name: str | None = None) -> None:
         super().__init__(dependencies=dependencies, name=name)
 
-    def calculate(self, inputs: list[Any]) -> U:
-        result = 1
+    def calculate(self, inputs: list[U]) -> U:
+        result: U = 1
         for value in inputs:
             result *= value
         return result
@@ -91,6 +91,3 @@ class NumericMinMaxNode(InputNode[U]):
         elif value > self._max_value:
             return self._max_value
         return value
-
-    def __repr__(self) -> str:
-        return str(self)
