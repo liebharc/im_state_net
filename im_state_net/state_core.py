@@ -177,10 +177,11 @@ class StateBuilder:
         return sorted_nodes
 
     def build(self) -> State:
-        for node in self.nodes:
+        nodes = self._sorted_nodes()
+        for node in nodes:
             if isinstance(node, DerivedNode):
                 node.on_build()
                 self.initial_values[node] = node.calculate(
                     [self.initial_values[dep] for dep in node.dependencies]
                 )
-        return State(pvector(self._sorted_nodes()), pmap(self.initial_values))
+        return State(pvector(nodes), pmap(self.initial_values))
