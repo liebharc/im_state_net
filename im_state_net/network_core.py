@@ -14,6 +14,12 @@ class AbstractNode(abc.ABC, Generic[T]):
         super().__init__()
         self._name = name or str(uuid.uuid4())
 
+    def on_compile(self) -> None:
+        """
+        Called when the network is compiled,
+        a node can be part of multiple networks.
+        """
+
     @property
     def name(self) -> str:
         return self._name
@@ -126,23 +132,24 @@ class Network:
         return result
 
 
+TDerivedNode = TypeVar("TDerivedNode", bound=DerivedNode[Any])
+TInputNode = TypeVar("TInputNode", bound=InputNode[Any])
+
+
 class NetworkBuilder:
     def __init__(self) -> None:
         self.nodes: list[AbstractNode[Any]] = []
         self.initial_values: dict[AbstractNode[Any], Any] = {}
 
-    def add_input(self, node: InputNode[T], value: T) -> InputNode[T]:
+    def add_input(self, node: TInputNode, value: T) -> TInputNode:
         self.nodes.append(node)
         self.initial_values[node] = value
         return node
 
     def add_calculation(
         self,
-        node: DerivedNode[T],
-    ) -> DerivedNode[T]:
-        self.initial_values[node] = node.calculate(
-            [self.initial_values[dep] for dep in node.dependencies]
-        )
+        node: TDerivedNode,
+    ) -> TDerivedNode:
         self.nodes.append(node)
         return node
 
@@ -170,4 +177,10 @@ class NetworkBuilder:
         return sorted_nodes
 
     def build(self) -> Network:
+        for node in self.nodes:
+            if isinstance(node, DerivedNode):
+                node.on_compile()
+                self.initial_values[node] = node.calculate(
+                    [self.initial_values[dep] for dep in node.dependencies]
+                )
         return Network(pvector(self._sorted_nodes()), pmap(self.initial_values))

@@ -41,6 +41,36 @@ class ProductNode(DerivedNode[U], Generic[U]):
         return result
 
 
+class PlaceholderNode(DerivedNode[U], Generic[U]):
+    """
+    A placeholder node that can be assigned a value later.
+    It gives more flexibility to build a network, but
+    creates the risk of building circular dependencies.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(dependencies=[])
+        self._node: DerivedNode[U] | None = None
+
+    def assign(self, node: DerivedNode[U]) -> None:
+        if self._node is not None:
+            raise ValueError("Placeholder node has already been assigned a value")
+
+        self._dependencies = node._dependencies
+        self._name = node._name
+        self._node = node
+
+    def calculate(self, inputs: list[Any]) -> U:
+        if self._node is None:
+            raise ValueError("Placeholder node has not been assigned a value yet")
+        return self._node.calculate(inputs)
+
+    def on_compile(self) -> None:
+        if self._node is None:
+            raise ValueError("Placeholder node has not been assigned a value yet")
+        self._node.on_compile()
+
+
 class NumericMinMaxNode(InputNode[U]):
     def __init__(self, min_value: U, max_value: U, name: str | None = None) -> None:
         super().__init__(name)
