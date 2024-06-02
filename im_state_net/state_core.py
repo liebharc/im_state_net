@@ -78,12 +78,20 @@ class State:
         values: PMap[AbstractNode[Any], Any],
         changes: PSet[AbstractNode[Any]] | None = None,
         initial_values: PMap[AbstractNode[Any], Any] | None = None,
+        version_id: uuid.UUID | None = None,
     ):
         self._nodes = nodes
         self._changes = changes or pset()
         self._values = values
         # initial values are the values since the last commit
         self._initial_values = initial_values or values
+
+        # the version id changes with every commit
+        self._version_id = version_id or uuid.uuid4()
+
+    @property
+    def version_id(self) -> uuid.UUID:
+        return self._version_id
 
     def change_value(self, node: InputNode[T], new_value: T) -> "State":
         new_value = node.validate(new_value)
@@ -93,7 +101,9 @@ class State:
             changes = self._changes.discard(node)
         else:
             changes = self._changes.add(node)
-        return State(self._nodes, values, changes, self._initial_values)
+        return State(
+            self._nodes, values, changes, self._initial_values, version_id=self._version_id
+        )
 
     def get_value(self, node: AbstractNode[T]) -> T:
         return cast(T, self._values[node])

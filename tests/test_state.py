@@ -48,10 +48,13 @@ class SimpleSumState:
 
 def test_valid_state():
     state = SimpleSumState()
+    initial_id = state.state.version_id
     assert state.get_value(state.calc) == 3
 
     state.set_value(state.val1, 3)
+    assert state.state.version_id == initial_id
     state.commit()
+    assert state.state.version_id != initial_id
 
     assert state.get_value(state.calc) == 5
     assert state.get_value(state.sum) == 5
