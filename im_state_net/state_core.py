@@ -1,5 +1,6 @@
 import abc
 import uuid
+from collections.abc import Set
 from typing import Any, Generic, TypeVar, cast
 
 from pyrsistent import pmap, pset, pvector
@@ -93,6 +94,10 @@ class State:
     def version_id(self) -> uuid.UUID:
         return self._version_id
 
+    @property
+    def changes(self) -> Set[AbstractNode[Any]]:
+        return self._changes
+
     def change_value(self, node: InputNode[T], new_value: T) -> "State":
         new_value = node.validate(new_value)
         old_value = self._initial_values.get(node)
@@ -108,9 +113,9 @@ class State:
     def get_value(self, node: AbstractNode[T]) -> T:
         return cast(T, self._values[node])
 
-    def commit(self) -> tuple["State", set[AbstractNode[Any]]]:
+    def commit(self) -> tuple["State", Set[AbstractNode[Any]]]:
         if len(self._changes) == 0:
-            return self, set()
+            return self, pset()
         nodes = self._nodes
         values = self._values
         changes = self._changes
@@ -123,7 +128,7 @@ class State:
                     values = values.set(node, new_value)
                     if not node.are_values_equal(old_value, new_value):
                         changes = changes.add(node)
-        return State(nodes, values, pset(), values), set(changes)
+        return State(nodes, values, pset(), values), changes
 
     def is_consistent(self) -> bool:
         """

@@ -33,7 +33,7 @@ Advantages:
 - Detects and allows for the reversal of changes.
 - Allows to combine multiple settings into a single commit.
 - Permits temporary inconsistent states, provided everything is valid upon commit.
-- Offers thread safety, enabling the preparation of subsequent settings while previous ones are still being executed.
+- Offers thread safety, enabling the preparation of subsequent settings while previous ones are still being executed. If we discuss threads and concurrency then we think about the general concept and not the specific implementation in Python.
 
 Disadvantages:
 
