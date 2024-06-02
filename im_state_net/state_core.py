@@ -24,6 +24,15 @@ class AbstractNode(abc.ABC, Generic[T]):
     def name(self) -> str:
         return self._name
 
+    def are_values_equal(self, value1: T, value2: T) -> bool:
+        """
+        Compares two values and returns True if they are equal.
+
+        Can be overwritten by subclasses to provide a custom
+        comparison method, e.g. by using a tolerance for floats.
+        """
+        return value1 == value2
+
     def __repr__(self) -> str:
         return str(self)
 
@@ -80,10 +89,10 @@ class State:
         new_value = node.validate(new_value)
         old_value = self._initial_values.get(node)
         values = self._values.set(node, new_value)
-        if old_value != new_value:
-            changes = self._changes.add(node)
-        else:
+        if old_value is not None and node.are_values_equal(old_value, new_value):
             changes = self._changes.discard(node)
+        else:
+            changes = self._changes.add(node)
         return State(self._nodes, values, changes, self._initial_values)
 
     def get_value(self, node: AbstractNode[T]) -> T:
@@ -102,7 +111,7 @@ class State:
                     new_value = node.calculate([values[dep] for dep in node.dependencies])
                     old_value = self._initial_values.get(node)
                     values = values.set(node, new_value)
-                    if old_value != new_value:
+                    if not node.are_values_equal(old_value, new_value):
                         changes = changes.add(node)
         return State(nodes, values, pset(), values), set(changes)
 

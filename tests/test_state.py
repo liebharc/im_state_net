@@ -1,5 +1,7 @@
 from typing import TypeVar
 
+import pytest
+
 from im_state_net.additional_base_classes import BinaryCalcNode
 from im_state_net.additional_nodes import (
     LambdaCalcNode,
@@ -55,6 +57,15 @@ def test_valid_state():
     assert state.get_value(state.sum) == 5
     assert state.get_value(state.product) == 6
     assert state.get_value(state.strnode) == "6.0"
+
+
+def test_missing_dependency():
+    builder = StateBuilder()
+    val1 = builder.add_input(InputNode(), 1)
+    val2 = InputNode()
+    result = builder.add_calculation(LambdaCalcNode(lambda x: x[0] + x[1], [val1, val2]))
+    with pytest.raises(Exception):
+        builder.build()
 
 
 def test_change_min_max_node():
